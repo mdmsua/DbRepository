@@ -9,6 +9,7 @@ namespace DbRepository
     public class DbRepository : IDbRepository
     {
         private readonly Database _db;
+
         static DbRepository()
         {
             DatabaseFactory.SetDatabaseProviderFactory(new DatabaseProviderFactory());
@@ -22,22 +23,25 @@ namespace DbRepository
         public DbRepository(string name)
         {
             _db = DatabaseFactory.CreateDatabase(name);
-
         }
 
         public T Get<T>(string procedure, IDictionary<string, object> parameters)
         {
-            var result = default(object);
-            var command = PrepareCommand(procedure, parameters);
-            using (var connection = _db.CreateConnection())
-            {
-                PrepareConnection(command, connection);
-                result = command.ExecuteScalar();
-            }
-            return (T)result;
+            var result = default(T);
+            var command = GetDbCommand(procedure, parameters);
+            result = (T)_db.ExecuteScalar(command);
+            return result;
         }
 
-        private DbCommand PrepareCommand(string procedure, IDictionary<string, object> parameters)
+        public Task<T> GetAsync<T>(string procedure, IDictionary<string, object> parameters)
+        {
+            if (_db.SupportsAsync)
+                return GetAsyncInternal<T>(procedure, parameters);
+            return Task.FromResult(Get<T>(procedure, parameters));
+        }
+
+        #region Privates
+        private DbCommand GetDbCommand(string procedure, IDictionary<string, object> parameters)
         {
             var command = _db.GetStoredProcCommand(procedure);
             if (_db.SupportsParemeterDiscovery)
@@ -57,33 +61,28 @@ namespace DbRepository
                 connection.Open();
         }
 
-        private async Task PrepareConnectionAsync(DbCommand command, DbConnection connection)
+        private Task PrepareConnectionAsync(DbCommand command, DbConnection connection)
         {
             if (command.Connection == default(DbConnection))
                 command.Connection = connection;
             if (connection.State != ConnectionState.Open)
-                await connection.OpenAsync();
+                return connection.OpenAsync();
+            return Task.Delay(0);
         }
+        #endregion
 
-
-        public async Task<T> GetAsync<T>(string procedure, IDictionary<string, object> parameters)
+        #region Internals
+        private async Task<T> GetAsyncInternal<T>(string procedure, IDictionary<string, object> parameters)
         {
             var result = default(object);
-            var command = PrepareCommand(procedure, parameters);
             using (var connection = _db.CreateConnection())
             {
-                if (_db.SupportsAsync)
-                {
-                    await PrepareConnectionAsync(command, connection);
-                    result = await command.ExecuteScalarAsync();
-                }
-                else
-                {
-                    PrepareConnection(command, connection);
-                    result = command.ExecuteScalar();
-                }
+                var command = GetDbCommand(procedure, parameters);
+                await PrepareConnectionAsync(command, connection);
+                result = await command.ExecuteScalarAsync();
             }
             return (T)result;
-        }
+        } 
+        #endregion
     }
 }
