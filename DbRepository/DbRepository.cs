@@ -27,21 +27,41 @@ namespace DbRepository
 
         public T Get<T>(string procedure, IDictionary<string, object> parameters)
         {
-            var result = default(T);
-            var command = GetDbCommand(procedure, parameters);
-            result = (T)_db.ExecuteScalar(command);
-            return result;
+            var command = GetCommand(procedure, parameters);
+            var result = default(object);
+            result = _db.ExecuteScalar(command);
+            return (T)result;
+        }
+
+        public IEnumerable<T> Read<T>(string procedure, IDictionary<string, object> parameters) where T : new()
+        {
+            var mapper = MapBuilder<T>.BuildAllProperties();
+            var command = GetCommand(procedure, parameters);
+            using (var reader = _db.ExecuteReader(command))
+            {
+                while (reader.Read())
+                {
+                    yield return mapper.MapRow(reader);
+                }
+            }
         }
 
         public Task<T> GetAsync<T>(string procedure, IDictionary<string, object> parameters)
         {
             if (_db.SupportsAsync)
-                return GetAsyncInternal<T>(procedure, parameters);
+                return DoGetAsync<T>(procedure, parameters);
             return Task.FromResult(Get<T>(procedure, parameters));
         }
 
+        public Task<IEnumerable<T>> ReadAsync<T>(string procedure, IDictionary<string, object> parameters) where T : new()
+        {
+            if (_db.SupportsAsync)
+                return DoReadAsync<T>(procedure, parameters);
+            return Task.FromResult(Read<T>(procedure, parameters));
+        }
+
         #region Privates
-        private DbCommand GetDbCommand(string procedure, IDictionary<string, object> parameters)
+        private DbCommand GetCommand(string procedure, IDictionary<string, object> parameters)
         {
             var command = _db.GetStoredProcCommand(procedure);
             if (_db.SupportsParemeterDiscovery)
@@ -53,35 +73,44 @@ namespace DbRepository
             return command;
         }
 
-        private void PrepareConnection(DbCommand command, DbConnection connection)
+        private Task PrepareCommand(DbCommand command, DbConnection connection)
         {
             if (command.Connection == default(DbConnection))
                 command.Connection = connection;
-            if (connection.State != ConnectionState.Open)
-                connection.Open();
-        }
-
-        private Task PrepareConnectionAsync(DbCommand command, DbConnection connection)
-        {
-            if (command.Connection == default(DbConnection))
-                command.Connection = connection;
-            if (connection.State != ConnectionState.Open)
-                return connection.OpenAsync();
-            return Task.Delay(0);
+            return connection.OpenAsync();
         }
         #endregion
 
         #region Internals
-        private async Task<T> GetAsyncInternal<T>(string procedure, IDictionary<string, object> parameters)
+        private async Task<T> DoGetAsync<T>(string procedure, IDictionary<string, object> parameters)
         {
-            var result = default(object);
             using (var connection = _db.CreateConnection())
             {
-                var command = GetDbCommand(procedure, parameters);
-                await PrepareConnectionAsync(command, connection);
+                var command = GetCommand(procedure, parameters);
+                await PrepareCommand(command, connection);
+                var result = default(object);
                 result = await command.ExecuteScalarAsync();
+                return (T)result;
             }
-            return (T)result;
+        }
+
+        private async Task<IEnumerable<T>> DoReadAsync<T>(string procedure, IDictionary<string, object> parameters) where T : new()
+        {
+            var mapper = MapBuilder<T>.BuildAllProperties();
+            var result = new List<T>();
+            using (var connection = _db.CreateConnection())
+            {
+                var command = GetCommand(procedure, parameters);
+                await PrepareCommand(command, connection);
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        result.Add(mapper.MapRow(reader));
+                    }
+                }
+            }
+            return result;
         } 
         #endregion
     }

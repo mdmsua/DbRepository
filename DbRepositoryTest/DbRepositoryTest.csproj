@@ -50,8 +50,11 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
-    <Compile Include="DbRepositoryTest.cs" />
+    <Compile Include="BillOfMaterials.cs" />
+    <Compile Include="Ctor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Get.cs" />
+    <Compile Include="Read.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DbRepository\DbRepository.csproj">
