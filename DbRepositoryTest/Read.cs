@@ -57,37 +57,43 @@ namespace DbRepositoryTest
         [TestMethod]
         public async Task ReadAsync_Is_Not_Null()
         {
-            var results = await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters, CancellationToken.None);
+            var results = await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
             Assert.IsNotNull(results);
         }
 
         [TestMethod]
         public async Task ReadAsync_Is_Instance_Of_Type()
         {
-            var results = await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters, CancellationToken.None);
+            var results = await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
             Assert.IsInstanceOfType(results, typeof(IEnumerable<BillOfMaterials>));
         }
 
         [TestMethod]
         public async Task ReadAsync_Has_3_Elements()
         {
-            var results = await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters, CancellationToken.None);
+            var results = await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
             Assert.AreEqual(3, results.Count());
         }
 
         [TestMethod]
         public async Task ReadAsync_First_Element_Equals_Reference()
         {
-            var results = await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters, CancellationToken.None);
+            var results = await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
             Assert.ReferenceEquals(Reference, results.First());
+        }
+
+        [TestMethod]
+        public async Task ReadAsync_With_Cancellation()
+        {
+            var results = await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters, new CancellationTokenSource().Token);
+            Assert.IsTrue(results.Any());
         }
 
         [TestMethod]
         [ExpectedException(typeof(TaskCanceledException))]
         public async Task ReadAsync_Throws_TaskCanceledException()
         {
-            var results = await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters, new CancellationTokenSource(0).Token);
-            Assert.ReferenceEquals(Reference, results.First());
+            await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters, new CancellationTokenSource(0).Token);
         }
 
         static BillOfMaterials Reference

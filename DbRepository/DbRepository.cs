@@ -1,8 +1,8 @@
 ﻿using Microsoft.Practices.EnterpriseLibrary.Data;
 using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Data.Common;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -27,7 +27,8 @@ namespace DbRepository
             _db = DatabaseFactory.CreateDatabase(name);
         }
 
-        public T Get<T>(string procedure, IDictionary<string, object> parameters)
+        #region Implementations
+        public T Scalar<T>(string procedure, Parameters parameters)
         {
             var command = GetCommand(procedure, parameters);
             var result = default(object);
@@ -35,7 +36,7 @@ namespace DbRepository
             return (T)result;
         }
 
-        public IEnumerable<T> Read<T>(string procedure, IDictionary<string, object> parameters) where T : new()
+        public IEnumerable<T> Read<T>(string procedure, Parameters parameters) where T : new()
         {
             var mapper = MapBuilder<T>.BuildAllProperties();
             var command = GetCommand(procedure, parameters);
@@ -48,22 +49,110 @@ namespace DbRepository
             }
         }
 
-        public Task<T> GetAsync<T>(string procedure, IDictionary<string, object> parameters, CancellationToken token)
+        public Task<T> ScalarAsync<T>(string procedure, Parameters parameters)
+        {
+            return ScalarAsync<T>(procedure, parameters, CancellationToken.None);
+        }
+
+        public Task<T> ScalarAsync<T>(string procedure, Parameters parameters, CancellationToken token)
         {
             if (_db.SupportsAsync)
                 return DoGetAsync<T>(procedure, parameters, token);
-            return Task.FromResult(Get<T>(procedure, parameters));
+            return Task.FromResult(Scalar<T>(procedure, parameters));
         }
 
-        public Task<IEnumerable<T>> ReadAsync<T>(string procedure, IDictionary<string, object> parameters, CancellationToken token) where T : new()
+        public Task<IEnumerable<T>> ReadAsync<T>(string procedure, Parameters parameters) where T : new()
+        {
+            return ReadAsync<T>(procedure, parameters, CancellationToken.None);
+        }
+
+        public Task<IEnumerable<T>> ReadAsync<T>(string procedure, Parameters parameters, CancellationToken token) where T : new()
         {
             if (_db.SupportsAsync)
                 return DoReadAsync<T>(procedure, parameters, token);
             return Task.FromResult(Read<T>(procedure, parameters));
         }
 
+        public bool Write(string procedure, Parameters parameters)
+        {
+            var rowsAffected = default(int);
+            using (var wrapper = GetOpenConnection())
+            {
+                using (var transaction = wrapper.Connection.BeginTransaction())
+                {
+                    var command = GetCommand(procedure, parameters);
+                    try
+                    {
+                        rowsAffected = _db.ExecuteNonQuery(command, transaction);
+                        transaction.Commit();
+                    }
+                    catch (Exception)
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
+                }
+            }
+            return rowsAffected > default(int);
+        }
+
+        public bool Write(Procedures procedures)
+        {
+            var rowsAffected = new List<int>(procedures.Count);
+            var commands = new List<DbCommand>(procedures.Count);
+            using (var wrapper = GetOpenConnection())
+            {
+                using (var transaction = wrapper.Connection.BeginTransaction())
+                {
+                    foreach (var procedure in procedures)
+                    {
+                        commands.Add(GetCommand(procedure.Key, procedure.Value));
+                    }
+                    try
+                    {
+                        foreach (var command in commands)
+                        {
+                            rowsAffected.Add(_db.ExecuteNonQuery(command, transaction));
+                        }
+                        transaction.Commit();
+                    }
+                    catch (Exception)
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
+                }
+            }
+            return rowsAffected.All(r => r > 0);
+        }
+
+        public Task<bool> WriteAsync(string procedure, Parameters parameters)
+        {
+            return WriteAsync(procedure, parameters, CancellationToken.None);
+        }
+
+        public Task<bool> WriteAsync(string procedure, Parameters parameters, CancellationToken token)
+        {
+            if (_db.SupportsAsync)
+                return DoWriteAsync(procedure, parameters, token);
+            return Task.FromResult(Write(procedure, parameters));
+        }
+
+        public Task<bool> WriteAsync(Procedures procedures)
+        {
+            return WriteAsync(procedures, CancellationToken.None);
+        }
+
+        public Task<bool> WriteAsync(Procedures procedures, CancellationToken token)
+        {
+            if (_db.SupportsAsync)
+                return DoWriteAsync(procedures, token);
+            return Task.FromResult(Write(procedures));
+        } 
+        #endregion
+
         #region Privates
-        private DbCommand GetCommand(string procedure, IDictionary<string, object> parameters)
+        private DbCommand GetCommand(string procedure, Parameters parameters)
         {
             var command = _db.GetStoredProcCommand(procedure);
             if (_db.SupportsParemeterDiscovery)
@@ -90,6 +179,36 @@ namespace DbRepository
 
             PrepareCommand(command, transaction.Connection);
             command.Transaction = transaction;
+        }
+
+        private DatabaseConnectionWrapper GetOpenConnection()
+        {
+            DatabaseConnectionWrapper connection = TransactionScopeConnections.GetConnection(_db);
+            return connection ?? GetWrappedConnection();
+        }
+
+        private DatabaseConnectionWrapper GetWrappedConnection()
+        {
+            return new DatabaseConnectionWrapper(GetNewOpenConnection());
+        }
+
+        private DbConnection GetNewOpenConnection()
+        {
+            DbConnection connection = null;
+            try
+            {
+                connection = _db.CreateConnection();
+                connection.Open();
+            }
+            catch
+            {
+                if (connection != null)
+                    connection.Close();
+
+                throw;
+            }
+
+            return connection;
         }
 
         private async Task<DatabaseConnectionWrapper> GetOpenConnectionAsync()
@@ -124,7 +243,7 @@ namespace DbRepository
         #endregion
 
         #region Internals
-        private async Task<T> DoGetAsync<T>(string procedure, IDictionary<string, object> parameters, CancellationToken token)
+        private async Task<T> DoGetAsync<T>(string procedure, Parameters parameters, CancellationToken token)
         {
             using (var wrapper = await GetOpenConnectionAsync())
             {
@@ -136,7 +255,7 @@ namespace DbRepository
             }
         }
 
-        private async Task<IEnumerable<T>> DoReadAsync<T>(string procedure, IDictionary<string, object> parameters, CancellationToken token) where T : new()
+        private async Task<IEnumerable<T>> DoReadAsync<T>(string procedure, Parameters parameters, CancellationToken token) where T : new()
         {
             var mapper = MapBuilder<T>.BuildAllProperties();
             var result = new List<T>();
@@ -153,7 +272,69 @@ namespace DbRepository
                 }
             }
             return result;
-        } 
+        }
+
+        private async Task<bool> DoWriteAsync(string procedure, Parameters parameters, CancellationToken token)
+        {
+            var result = default(bool);
+            var rowsAffected = default(int);
+            using (var wrapper = await GetOpenConnectionAsync())
+            {
+                using (var transaction = wrapper.Connection.BeginTransaction())
+                {
+                    var command = GetCommand(procedure, parameters);
+                    PrepareCommand(command, transaction);
+                    try
+                    {
+                        rowsAffected = await command.ExecuteNonQueryAsync(token);
+                        transaction.Commit();
+                    }
+                    catch (Exception)
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
+                    finally
+                    {
+                        result = rowsAffected > 0;
+                    }
+                }
+            }
+            return result;
+        }
+
+        private async Task<bool> DoWriteAsync(Procedures procedures, CancellationToken token)
+        {
+            var result = default(bool);
+            var tasks = new List<Task<int>>(procedures.Count);
+            using (var wrapper = await GetOpenConnectionAsync())
+            {
+                using (var transaction = wrapper.Connection.BeginTransaction())
+                {
+                    foreach (var procedure in procedures)
+                    {
+                        var command = GetCommand(procedure.Key, procedure.Value);
+                        PrepareCommand(command, transaction);
+                        tasks.Add(command.ExecuteNonQueryAsync(token));
+                    }
+                    try
+                    {
+                        await Task.WhenAll(tasks);
+                        transaction.Commit();
+                    }
+                    catch (Exception)
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
+                    finally
+                    {
+                        result = tasks.All(t => t.Result > 0);
+                    }
+                }
+            }
+            return result;
+        }
         #endregion
     }
 }

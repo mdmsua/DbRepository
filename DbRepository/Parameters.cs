@@ -4,10 +4,13 @@ namespace DbRepository
 {
     public sealed class Parameters : Dictionary<string, object>
     {
-        public Parameters(int capacity) : base(capacity) { }
+        private readonly int _capacity;
+
+        public Parameters(int capacity) : base(capacity) { _capacity = capacity; }
         
         public Parameters Set(string key, object value)
         {
+            if (Count == _capacity) throw new CapacityExceededException(_capacity);
             Add(key, value);
             return this;
         }

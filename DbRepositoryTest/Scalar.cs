@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace DbRepositoryTest
 {
     [TestClass]
-    public class Get
+    public class Scalar
     {
         private DbRepository.IDbRepository repository;
         
@@ -28,7 +28,7 @@ namespace DbRepositoryTest
         [TestMethod]
         public void Get_Returns_Scalar_Value_3()
         {
-            var result = repository.Get<int>("uspSearchCandidateResumes", Parameters.Create(1).Set("searchString", "C#"));
+            var result = repository.Scalar<int>("uspSearchCandidateResumes", Parameters.Create(1).Set("searchString", "C#"));
             Assert.AreEqual(3, result);
         }
 
@@ -36,14 +36,21 @@ namespace DbRepositoryTest
         [ExpectedException(typeof(InvalidCastException))]
         public void Get_Throws_InvalidCastException()
         {
-            var result = repository.Get<string>("uspSearchCandidateResumes", Parameters.Create(1).Set("searchString", "C#"));
+            var result = repository.Scalar<string>("uspSearchCandidateResumes", Parameters.Create(1).Set("searchString", "C#"));
             Assert.AreEqual(3, result);
         }
 
         [TestMethod]
         public async Task GetAsync_Returns_Scalar_Value_3()
         {
-            var result = await repository.GetAsync<int>("uspSearchCandidateResumes", Parameters.Create(1).Set("searchString", "C#"), CancellationToken.None);
+            var result = await repository.ScalarAsync<int>("uspSearchCandidateResumes", Parameters.Create(1).Set("searchString", "C#"));
+            Assert.AreEqual(3, result);
+        }
+
+        [TestMethod]
+        public async Task GetAsync_With_Cancellation()
+        {
+            var result = await repository.ScalarAsync<int>("uspSearchCandidateResumes", Parameters.Create(1).Set("searchString", "C#"), new CancellationTokenSource().Token);
             Assert.AreEqual(3, result);
         }
 
@@ -51,7 +58,7 @@ namespace DbRepositoryTest
         [ExpectedException(typeof(TaskCanceledException))]
         public async Task GetAsync_Throws_TaskCanceledException()
         {
-            var result = await repository.GetAsync<int>("uspSearchCandidateResumes", Parameters.Create(1).Set("searchString", "C#"), new CancellationTokenSource(0).Token);
+            var result = await repository.ScalarAsync<int>("uspSearchCandidateResumes", Parameters.Create(1).Set("searchString", "C#"), new CancellationTokenSource(0).Token);
             Assert.AreEqual(3, result);
         }
 
@@ -59,7 +66,7 @@ namespace DbRepositoryTest
         [ExpectedException(typeof(InvalidCastException))]
         public async Task GetAsync_Throws_InvalidCastException()
         {
-            var result = await repository.GetAsync<string>("uspSearchCandidateResumes", Parameters.Create(1).Set("searchString", "C#"), CancellationToken.None);
+            var result = await repository.ScalarAsync<string>("uspSearchCandidateResumes", Parameters.Create(1).Set("searchString", "C#"));
             Assert.AreEqual(3, result);
         }
     }

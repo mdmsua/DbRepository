@@ -46,8 +46,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CapacityExceededException.cs" />
     <Compile Include="DbRepository.cs" />
     <Compile Include="IDbRepository.cs" />
+    <Compile Include="Procedures.cs" />
     <Compile Include="Parameters.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
