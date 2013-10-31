@@ -1,6 +1,7 @@
 ﻿using DbRepository;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Configuration;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,14 +24,14 @@ namespace DbRepositoryTest
         {
             get
             {
-                return Procedures.Create(2).Set("Append", Parameters).Set("Depend", Parameters);
+                return Procedures.Create(2).Set("Submit", Parameters).Set("Rebind", Parameters);
             }
         }
-        
+
         [TestInitialize]
         public void Initialize()
         {
-            repository = new DbRepository.DbRepository("Write");
+            repository = new DbRepository.DbRepository("Write-Only");
         }
 
         [TestCleanup]
@@ -43,7 +44,7 @@ namespace DbRepositoryTest
         [TestMethod]
         public void Write_One_Procedure_Succeeds()
         {
-            var result = repository.Write("Append", Parameters);
+            var result = repository.Write("Submit", Parameters);
             Assert.IsTrue(result);
         }
 
@@ -57,7 +58,7 @@ namespace DbRepositoryTest
         [TestMethod]
         public async Task Write_One_Procedure_Succeeds_Async()
         {
-            var result = await repository.WriteAsync("Append", Parameters);
+            var result = await repository.WriteAsync("Submit", Parameters);
             Assert.IsTrue(result);
         }
 
@@ -72,7 +73,7 @@ namespace DbRepositoryTest
         [ExpectedException(typeof(TaskCanceledException))]
         public async Task Write_One_Procedure_Fails_With_TaskCanceledException()
         {
-            await repository.WriteAsync("Append", Parameters, new CancellationTokenSource(0).Token);
+            await repository.WriteAsync("Submit", Parameters, new CancellationTokenSource(0).Token);
         }
 
         [TestMethod]
