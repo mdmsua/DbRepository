@@ -1,7 +1,9 @@
 ﻿using Microsoft.Practices.EnterpriseLibrary.Data;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DbRepository
@@ -46,17 +48,17 @@ namespace DbRepository
             }
         }
 
-        public Task<T> GetAsync<T>(string procedure, IDictionary<string, object> parameters)
+        public Task<T> GetAsync<T>(string procedure, IDictionary<string, object> parameters, CancellationToken token)
         {
             if (_db.SupportsAsync)
-                return DoGetAsync<T>(procedure, parameters);
+                return DoGetAsync<T>(procedure, parameters, token);
             return Task.FromResult(Get<T>(procedure, parameters));
         }
 
-        public Task<IEnumerable<T>> ReadAsync<T>(string procedure, IDictionary<string, object> parameters) where T : new()
+        public Task<IEnumerable<T>> ReadAsync<T>(string procedure, IDictionary<string, object> parameters, CancellationToken token) where T : new()
         {
             if (_db.SupportsAsync)
-                return DoReadAsync<T>(procedure, parameters);
+                return DoReadAsync<T>(procedure, parameters, token);
             return Task.FromResult(Read<T>(procedure, parameters));
         }
 
@@ -73,38 +75,78 @@ namespace DbRepository
             return command;
         }
 
-        private Task PrepareCommand(DbCommand command, DbConnection connection)
+        private void PrepareCommand(DbCommand command, DbConnection connection)
         {
-            if (command.Connection == default(DbConnection))
-                command.Connection = connection;
-            return connection.OpenAsync();
+            if (command == null) throw new ArgumentNullException("command");
+            if (connection == null) throw new ArgumentNullException("connection");
+            
+            command.Connection = connection;
+        }
+
+        private void PrepareCommand(DbCommand command, DbTransaction transaction)
+        {
+            if (command == null) throw new ArgumentNullException("command");
+            if (transaction == null) throw new ArgumentNullException("connection");
+
+            PrepareCommand(command, transaction.Connection);
+            command.Transaction = transaction;
+        }
+
+        private async Task<DatabaseConnectionWrapper> GetOpenConnectionAsync()
+        {
+            DatabaseConnectionWrapper connection = TransactionScopeConnections.GetConnection(_db);
+            return connection ?? await GetWrappedConnectionAsync();
+        }
+
+        private async Task<DatabaseConnectionWrapper> GetWrappedConnectionAsync()
+        {
+            return new DatabaseConnectionWrapper(await GetNewOpenConnectionAsync());
+        }
+
+        private async Task<DbConnection> GetNewOpenConnectionAsync()
+        {
+            DbConnection connection = null;
+            try
+            {
+                connection = _db.CreateConnection();
+                await connection.OpenAsync();
+            }
+            catch
+            {
+                if (connection != null)
+                    connection.Close();
+
+                throw;
+            }
+
+            return connection;
         }
         #endregion
 
         #region Internals
-        private async Task<T> DoGetAsync<T>(string procedure, IDictionary<string, object> parameters)
+        private async Task<T> DoGetAsync<T>(string procedure, IDictionary<string, object> parameters, CancellationToken token)
         {
-            using (var connection = _db.CreateConnection())
+            using (var wrapper = await GetOpenConnectionAsync())
             {
                 var command = GetCommand(procedure, parameters);
-                await PrepareCommand(command, connection);
+                PrepareCommand(command, wrapper.Connection);
                 var result = default(object);
-                result = await command.ExecuteScalarAsync();
+                result = await command.ExecuteScalarAsync(token);
                 return (T)result;
             }
         }
 
-        private async Task<IEnumerable<T>> DoReadAsync<T>(string procedure, IDictionary<string, object> parameters) where T : new()
+        private async Task<IEnumerable<T>> DoReadAsync<T>(string procedure, IDictionary<string, object> parameters, CancellationToken token) where T : new()
         {
             var mapper = MapBuilder<T>.BuildAllProperties();
             var result = new List<T>();
-            using (var connection = _db.CreateConnection())
+            using (var wrapper = await GetOpenConnectionAsync())
             {
                 var command = GetCommand(procedure, parameters);
-                await PrepareCommand(command, connection);
-                using (var reader = await command.ExecuteReaderAsync())
+                PrepareCommand(command, wrapper.Connection);
+                using (var reader = await command.ExecuteReaderAsync(token))
                 {
-                    while (await reader.ReadAsync())
+                    while (await reader.ReadAsync(token))
                     {
                         result.Add(mapper.MapRow(reader));
                     }
