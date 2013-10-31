@@ -82,6 +82,14 @@ namespace DbRepositoryTest
             Assert.ReferenceEquals(Reference, results.First());
         }
 
+        [TestMethod]
+        [ExpectedException(typeof(TaskCanceledException))]
+        public async Task ReadAsync_Throws_TaskCanceledException()
+        {
+            var results = await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters, new CancellationTokenSource(0).Token);
+            Assert.ReferenceEquals(Reference, results.First());
+        }
+
         static BillOfMaterials Reference
         {
             get
