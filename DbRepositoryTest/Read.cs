@@ -1,4 +1,5 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using DbRepository;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,40 +13,56 @@ namespace DbRepositoryTest
         [TestMethod]
         public void Read_Is_Not_Null()
         {
-            var parameters = new Dictionary<string, object>();
-            parameters.Add("StartProductID", 3);
-            parameters.Add("CheckDate", new DateTime(2004, 7, 25));
-            var results = new DbRepository.DbRepository().Read<BillOfMaterials>("uspGetBillOfMaterials", parameters);
+            var results = new DbRepository.DbRepository().Read<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
             Assert.IsNotNull(results);
         }
 
         [TestMethod]
         public void Read_Is_Instance_Of_Type()
         {
-            var parameters = new Dictionary<string, object>();
-            parameters.Add("StartProductID", 3);
-            parameters.Add("CheckDate", new DateTime(2004, 7, 25));
-            var results = new DbRepository.DbRepository().Read<BillOfMaterials>("uspGetBillOfMaterials", parameters);
+            var results = new DbRepository.DbRepository().Read<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
             Assert.IsInstanceOfType(results, typeof(IEnumerable<BillOfMaterials>));
         }
 
         [TestMethod]
         public void Read_Has_3_Elements()
         {
-            var parameters = new Dictionary<string, object>();
-            parameters.Add("StartProductID", 3);
-            parameters.Add("CheckDate", new DateTime(2004, 7, 25));
-            var results = new DbRepository.DbRepository().Read<BillOfMaterials>("uspGetBillOfMaterials", parameters);
+            var results = new DbRepository.DbRepository().Read<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
             Assert.AreEqual(3, results.Count());
         }
 
         [TestMethod]
         public void Read_First_Element_Equals_Reference()
         {
-            var parameters = new Dictionary<string, object>();
-            parameters.Add("StartProductID", 3);
-            parameters.Add("CheckDate", new DateTime(2004, 7, 25));
-            var results = new DbRepository.DbRepository().Read<BillOfMaterials>("uspGetBillOfMaterials", parameters);
+            var results = new DbRepository.DbRepository().Read<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
+            Assert.ReferenceEquals(Reference, results.First());
+        }
+
+        [TestMethod]
+        public async Task ReadAsync_Is_Not_Null()
+        {
+            var results = await new DbRepository.DbRepository().ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
+            Assert.IsNotNull(results);
+        }
+
+        [TestMethod]
+        public async Task ReadAsync_Is_Instance_Of_Type()
+        {
+            var results = await new DbRepository.DbRepository().ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
+            Assert.IsInstanceOfType(results, typeof(IEnumerable<BillOfMaterials>));
+        }
+
+        [TestMethod]
+        public async Task ReadAsync_Has_3_Elements()
+        {
+            var results = await new DbRepository.DbRepository().ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
+            Assert.AreEqual(3, results.Count());
+        }
+
+        [TestMethod]
+        public async Task ReadAsync_First_Element_Equals_Reference()
+        {
+            var results = await new DbRepository.DbRepository().ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
             Assert.ReferenceEquals(Reference, results.First());
         }
 
@@ -67,44 +84,12 @@ namespace DbRepositoryTest
             }
         }
 
-        [TestMethod]
-        public async Task ReadAsync_Is_Not_Null()
+        static Parameters Parameters
         {
-            var parameters = new Dictionary<string, object>();
-            parameters.Add("StartProductID", 3);
-            parameters.Add("CheckDate", new DateTime(2004, 7, 25));
-            var results = await new DbRepository.DbRepository().ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", parameters);
-            Assert.IsNotNull(results);
-        }
-
-        [TestMethod]
-        public async Task ReadAsync_Is_Instance_Of_Type()
-        {
-            var parameters = new Dictionary<string, object>();
-            parameters.Add("StartProductID", 3);
-            parameters.Add("CheckDate", new DateTime(2004, 7, 25));
-            var results = await new DbRepository.DbRepository().ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", parameters);
-            Assert.IsInstanceOfType(results, typeof(IEnumerable<BillOfMaterials>));
-        }
-
-        [TestMethod]
-        public async Task ReadAsync_Has_3_Elements()
-        {
-            var parameters = new Dictionary<string, object>();
-            parameters.Add("StartProductID", 3);
-            parameters.Add("CheckDate", new DateTime(2004, 7, 25));
-            var results = await new DbRepository.DbRepository().ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", parameters);
-            Assert.AreEqual(3, results.Count());
-        }
-
-        [TestMethod]
-        public async Task ReadAsync_First_Element_Equals_Reference()
-        {
-            var parameters = new Dictionary<string, object>();
-            parameters.Add("StartProductID", 3);
-            parameters.Add("CheckDate", new DateTime(2004, 7, 25));
-            var results = await new DbRepository.DbRepository().ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", parameters);
-            Assert.ReferenceEquals(Reference, results.First());
+            get
+            {
+                return Parameters.Create(2).Set("StartProductID", 3).Set("CheckDate", new DateTime(2004, 7, 25));
+            }
         }
     }
 }

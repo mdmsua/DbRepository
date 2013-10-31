@@ -48,6 +48,7 @@
   <ItemGroup>
     <Compile Include="DbRepository.cs" />
     <Compile Include="IDbRepository.cs" />
+    <Compile Include="Parameters.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
