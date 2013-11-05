@@ -1,6 +1,7 @@
 ﻿using Microsoft.Practices.EnterpriseLibrary.Data;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Threading;
@@ -152,6 +153,20 @@ namespace DbRepository
         #endregion
 
         #region Privates
+        private void SetValue(DbCommand command, KeyValuePair<string, object> parameter)
+        {
+            var parameterName = _db.BuildParameterName(parameter.Key);
+            if (command.Parameters.Contains(parameterName))
+            {
+                DbType srcDbType, destDbType;
+                destDbType = command.Parameters[parameterName].DbType;
+                if (Enum.TryParse<DbType>(parameter.Value.GetType().Name, out srcDbType) && srcDbType == destDbType)
+                    _db.SetParameterValue(command, parameterName, parameter.Value);
+                else
+                    throw new ParameterTypeException(command.CommandText, parameterName, destDbType.ToString(), srcDbType.ToString());
+            }
+        }
+
         private DbCommand GetCommand(string procedure, Parameters parameters)
         {
             var command = _db.GetStoredProcCommand(procedure);
@@ -159,7 +174,7 @@ namespace DbRepository
                 _db.DiscoverParameters(command);
             foreach (var parameter in parameters)
             {
-                _db.SetParameterValue(command, _db.BuildParameterName(parameter.Key), parameter.Value);
+                SetValue(command, parameter);
             }
             return command;
         }

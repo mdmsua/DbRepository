@@ -96,6 +96,13 @@ namespace DbRepositoryTest
             await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters, new CancellationTokenSource(0).Token);
         }
 
+        [TestMethod]
+        [ExpectedException(typeof(ParameterTypeException))]
+        public void Read_Throws_ParameterTypeException()
+        {
+            var result = repository.Read<BillOfMaterials>("uspGetBillOfMaterials", ThrowingParameterTypeException);
+        }
+
         static BillOfMaterials Reference
         {
             get
@@ -119,6 +126,14 @@ namespace DbRepositoryTest
             get
             {
                 return Parameters.Create(2).Set("StartProductID", 3).Set("CheckDate", new DateTime(2004, 7, 25));
+            }
+        }
+
+        static Parameters ThrowingParameterTypeException
+        {
+            get
+            {
+                return Parameters.Create(2).Set("StartProductID", new Exception()).Set("CheckDate", new DateTime(2004, 7, 25));
             }
         }
     }
