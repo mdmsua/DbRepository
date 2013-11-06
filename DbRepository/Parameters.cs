@@ -1,4 +1,6 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 
 namespace DbRepository
 {
@@ -18,6 +20,27 @@ namespace DbRepository
         public static Parameters Create(int capacity)
         {
             return new Parameters(capacity);
+        }
+
+        public static Parameters From<T>(T entity)
+        {
+            var properties = entity.GetType().GetProperties().AsParallel().Where(p => p.CanRead).ToList();
+            var parameters = Create(properties.Count);
+            properties.ForEach(p => TrySetParameter(parameters, p, entity));
+            return parameters;
+        }
+
+        private static bool TrySetParameter<T>(Parameters parameters, PropertyInfo property, T value)
+        {
+            try
+            {
+                parameters.Add(property.Name, property.GetValue(value));
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }
