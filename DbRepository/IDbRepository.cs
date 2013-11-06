@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,9 +11,9 @@ namespace DbRepository
         Task<T> ScalarAsync<T>(string procedure, Parameters parameters);
         Task<T> ScalarAsync<T>(string procedure, Parameters parameters, CancellationToken token);
 
-        IEnumerable<T> Read<T>(string procedure, Parameters parameters) where T : new();
-        Task<IEnumerable<T>> ReadAsync<T>(string procedure, Parameters parameters) where T : new();
-        Task<IEnumerable<T>> ReadAsync<T>(string procedure, Parameters parameters, CancellationToken token) where T : new();
+        IReadOnlyCollection<T> Read<T>(string procedure, Parameters parameters) where T : new();
+        Task<IReadOnlyCollection<T>> ReadAsync<T>(string procedure, Parameters parameters) where T : new();
+        Task<IReadOnlyCollection<T>> ReadAsync<T>(string procedure, Parameters parameters, CancellationToken token) where T : new();
 
         bool Write(Procedures procedures);
         bool Write(string procedure, Parameters parameters);

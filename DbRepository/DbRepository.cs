@@ -1,6 +1,7 @@
 ﻿using Microsoft.Practices.EnterpriseLibrary.Data;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Data;
 using System.Data.Common;
 using System.Linq;
@@ -37,17 +38,9 @@ namespace DbRepository
             return (T)result;
         }
 
-        public IEnumerable<T> Read<T>(string procedure, Parameters parameters) where T : new()
+        public IReadOnlyCollection<T> Read<T>(string procedure, Parameters parameters) where T : new()
         {
-            var mapper = MapBuilder<T>.BuildAllProperties();
-            var command = GetCommand(procedure, parameters);
-            using (var reader = _db.ExecuteReader(command))
-            {
-                while (reader.Read())
-                {
-                    yield return mapper.MapRow(reader);
-                }
-            }
+            return new ReadOnlyCollection<T>(DoRead<T>(procedure, parameters).ToList());
         }
 
         public Task<T> ScalarAsync<T>(string procedure, Parameters parameters)
@@ -62,12 +55,12 @@ namespace DbRepository
             return Task.FromResult(Scalar<T>(procedure, parameters));
         }
 
-        public Task<IEnumerable<T>> ReadAsync<T>(string procedure, Parameters parameters) where T : new()
+        public Task<IReadOnlyCollection<T>> ReadAsync<T>(string procedure, Parameters parameters) where T : new()
         {
             return ReadAsync<T>(procedure, parameters, CancellationToken.None);
         }
 
-        public Task<IEnumerable<T>> ReadAsync<T>(string procedure, Parameters parameters, CancellationToken token) where T : new()
+        public Task<IReadOnlyCollection<T>> ReadAsync<T>(string procedure, Parameters parameters, CancellationToken token) where T : new()
         {
             if (_db.SupportsAsync)
                 return DoReadAsync<T>(procedure, parameters, token);
@@ -153,18 +146,23 @@ namespace DbRepository
         #endregion
 
         #region Privates
-        private void SetValue(DbCommand command, KeyValuePair<string, object> parameter)
+        private void SetParameter(DbCommand command, string name, object value)
         {
-            var parameterName = _db.BuildParameterName(parameter.Key);
-            if (command.Parameters.Contains(parameterName))
+            var procParamName = _db.BuildParameterName(name);
+            if (command.Parameters.Contains(procParamName))
             {
                 DbType srcDbType, destDbType;
-                destDbType = command.Parameters[parameterName].DbType;
-                if (Enum.TryParse<DbType>(parameter.Value.GetType().Name, out srcDbType) && srcDbType == destDbType)
-                    _db.SetParameterValue(command, parameterName, parameter.Value);
+                destDbType = command.Parameters[procParamName].DbType;
+                if (Enum.TryParse<DbType>(value.GetType().Name, out srcDbType) && srcDbType == destDbType)
+                    _db.SetParameterValue(command, procParamName, value);
                 else
-                    throw new ParameterTypeException(command.CommandText, parameterName, destDbType.ToString(), srcDbType.ToString());
+                    throw new ParameterTypeException(command.CommandText, procParamName, destDbType.ToString(), srcDbType.ToString());
             }
+        }
+
+        private void SetParameters(DbCommand command, IDictionary<string, object> parameters)
+        {
+            parameters.ToList().ForEach(p => SetParameter(command, p.Key, p.Value));
         }
 
         private DbCommand GetCommand(string procedure, Parameters parameters)
@@ -172,10 +170,7 @@ namespace DbRepository
             var command = _db.GetStoredProcCommand(procedure);
             if (_db.SupportsParemeterDiscovery)
                 _db.DiscoverParameters(command);
-            foreach (var parameter in parameters)
-            {
-                SetValue(command, parameter);
-            }
+            SetParameters(command, parameters);
             return command;
         }
 
@@ -258,6 +253,19 @@ namespace DbRepository
         #endregion
 
         #region Internals
+        private IEnumerable<T> DoRead<T>(string procedure, Parameters parameters) where T : new()
+        {
+            var command = GetCommand(procedure, parameters);
+            using (var reader = _db.ExecuteReader(command))
+            {
+                var mapper = MapBuilder<T>.BuildAllProperties();
+                while (reader.Read())
+                {
+                    yield return mapper.MapRow(reader);
+                }
+            }
+        }
+
         private async Task<T> DoGetAsync<T>(string procedure, Parameters parameters, CancellationToken token)
         {
             using (var wrapper = await GetOpenConnectionAsync())
@@ -270,7 +278,7 @@ namespace DbRepository
             }
         }
 
-        private async Task<IEnumerable<T>> DoReadAsync<T>(string procedure, Parameters parameters, CancellationToken token) where T : new()
+        private async Task<IReadOnlyCollection<T>> DoReadAsync<T>(string procedure, Parameters parameters, CancellationToken token) where T : new()
         {
             var mapper = MapBuilder<T>.BuildAllProperties();
             var result = new List<T>();

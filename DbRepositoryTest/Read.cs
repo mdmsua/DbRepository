@@ -37,7 +37,7 @@ namespace DbRepositoryTest
         public void Read_Is_Instance_Of_Type()
         {
             var results = repository.Read<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
-            Assert.IsInstanceOfType(results, typeof(IEnumerable<BillOfMaterials>));
+            Assert.IsInstanceOfType(results, typeof(IReadOnlyCollection<BillOfMaterials>));
         }
 
         [TestMethod]
@@ -65,7 +65,7 @@ namespace DbRepositoryTest
         public async Task ReadAsync_Is_Instance_Of_Type()
         {
             var results = await repository.ReadAsync<BillOfMaterials>("uspGetBillOfMaterials", Parameters);
-            Assert.IsInstanceOfType(results, typeof(IEnumerable<BillOfMaterials>));
+            Assert.IsInstanceOfType(results, typeof(IReadOnlyCollection<BillOfMaterials>));
         }
 
         [TestMethod]
@@ -100,7 +100,7 @@ namespace DbRepositoryTest
         [ExpectedException(typeof(ParameterTypeException))]
         public void Read_Throws_ParameterTypeException()
         {
-            var result = repository.Read<BillOfMaterials>("uspGetBillOfMaterials", ThrowingParameterTypeException);
+            repository.Read<BillOfMaterials>("uspGetBillOfMaterials", ThrowingParameterTypeException);
         }
 
         static BillOfMaterials Reference
@@ -133,7 +133,7 @@ namespace DbRepositoryTest
         {
             get
             {
-                return Parameters.Create(2).Set("StartProductID", new Exception()).Set("CheckDate", new DateTime(2004, 7, 25));
+                return Parameters.Create(2).Set("StartProductID", Guid.Empty).Set("CheckDate", new DateTime(2004, 7, 25));
             }
         }
     }

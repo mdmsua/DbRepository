@@ -28,7 +28,7 @@ namespace DbRepository
         {
             get
             {
-                return string.Format("Type {0} of the parameter {1} assigned to command {2} is not expected. Required type: {3}", _obtained, _parameter, _command, _expected);
+                return string.Format("Type of the parameter '{0}' assigned to command '{1}' is '{2}'. Expecting: '{3}'", _parameter, _command, _obtained, _expected);
             }
         }
     }
