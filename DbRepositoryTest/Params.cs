@@ -1,5 +1,6 @@
 ﻿using DbRepository;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 using System.Linq;
 
 namespace DbRepositoryTest
@@ -40,6 +41,13 @@ namespace DbRepositoryTest
         {
             var parameters = Parameters.Create(1).Set("foo", "bar");
             Assert.AreEqual<string>("bar", (string)parameters.Values.Single());
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public void Set_Parameters_Throws_ArgumentException()
+        {
+            Parameters.Create(2).Set("foo", "bar").Set("foo", "bar");
         }
 
         static BillOfMaterials Reference

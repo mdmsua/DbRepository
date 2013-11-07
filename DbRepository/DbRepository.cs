@@ -160,7 +160,7 @@ namespace DbRepository
             }
         }
 
-        private void SetParameters(DbCommand command, IDictionary<string, object> parameters)
+        private void SetParameters(DbCommand command, IReadOnlyDictionary<string, object> parameters)
         {
             parameters.ToList().ForEach(p => SetParameter(command, p.Key, p.Value));
         }
